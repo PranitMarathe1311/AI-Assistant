@@ -5,9 +5,9 @@
 const CLIENT = {
 
   // -- ASSISTANT IDENTITY --
-  name:            "Aria",          // Name shown in chat header
+  name:            "Saanvi",          // Name shown in chat header
   initials:        "AI",            // Shown in avatar circle if no logo
-  logo:            "",              // Direct image URL (leave "" to use initials)
+  logo:            "https://pranitmarathe1311.github.io/AI-Assistant/Logo.jpeg",              // Direct image URL (leave "" to use initials)
                                     // e.g. "https://example.com/logo.png"
 
   // -- COLORS --
@@ -21,11 +21,11 @@ const CLIENT = {
   font:            "'DM Sans', sans-serif",
 
   // -- MESSAGES --
-  welcomeMessage:  "Hi there! 👋 I'm Aria, your AI assistant. How can I help you today?",
+  welcomeMessage:  "Hi there! 👋 I'm Saanvi, your AI assistant. How can I help you today?",
   errorMessage:    "Sorry, I'm having a little trouble right now. Please try again in a moment! 🙏",
   placeholder:     "Type your message...",
   footerText:      "Powered by AI",
-  statusText:      "● Online — replies instantly",
+  statusText:      "● Online",
 
   // -- SIZE (pixels) --
   chatWidth:       370,             // Chat window width  (recommended: 300–500)
@@ -37,7 +37,7 @@ const CLIENT = {
   rightOffset:     28,              // Distance from right of screen (px)
 
   // -- CONNECTION --
-  webhookUrl:      "YOUR_WEBHOOK_URL_HERE",
+  webhookUrl:      "https://hook.eu1.make.com/dcfid7768ftknwooemtpvecp3xjr4otd",
 
 };
 
