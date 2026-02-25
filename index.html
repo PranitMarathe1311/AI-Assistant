@@ -17,7 +17,7 @@ const CLIENT = {
   // -- ASSISTANT IDENTITY --
   name:           "Saanvi",
   initials:       "AI",
-  logo:           "https://pranitmarathe1311.github.io/AI-Assistant/Logo.jpeg",               // Direct image URL or leave "" for initials
+  logo:           "Logo.jpeg",               // Direct image URL or leave "" for initials
                                     // e.g. "https://yourcdn.com/client-logo.png"
 
   // -- COLORS --
@@ -467,14 +467,14 @@ const CLIENT = {
     var text = input.value.trim();
     if (!text || isWaiting) return;
 
-    // Build plain text history — safe, never breaks JSON
+    // Build plain text history — using | separator instead of newlines to avoid JSON breaking
     var historyText = conversationHistory.slice(-6).map(function(m) {
       return (m.role === "user" ? "Visitor" : "Saanvi") + ": " + m.content;
-    }).join("\n");
+    }).join(" | ");
 
     // Prepend history to message so Groq has full context
     var fullMessage = conversationHistory.length > 0
-      ? "CONVERSATION SO FAR:\n" + historyText + "\n\nCurrent message: " + text
+      ? "CONVERSATION SO FAR: " + historyText + " | Current message: " + text
       : text;
 
     conversationHistory.push({ role: "user", content: text });
