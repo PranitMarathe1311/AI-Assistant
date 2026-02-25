@@ -491,9 +491,16 @@ const CLIENT = {
       var res = await fetch(CLIENT.webhookUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        
+        var historyText = conversationHistory.slice(-6).map(function(m) {
+          return (m.role === "user" ? "Visitor: " : "Saanvi: ") + m.content;
+        }).join("\n");
+
+      // Format history as clean readable text
         body: JSON.stringify({
           message: text,
-          history: JSON.stringify(conversationHistory)  // full history so AI never forgets and stringify so the history don't break JSON syntax
+          history: historyText
+        })  // full history so AI never forgets and stringify so the history don't break JSON syntax
         })
       });
       var data = await res.json();
