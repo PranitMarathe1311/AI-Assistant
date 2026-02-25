@@ -47,7 +47,6 @@ const CLIENT = {
   rightOffset:    28,               // Distance from right of screen (px)
 
   // -- CONNECTION --
-  // Different for each client
   webhookUrl:     "https://hook.eu1.make.com/dcfid7768ftknwooemtpvecp3xjr4otd",
 
 };
@@ -369,6 +368,9 @@ const CLIENT = {
 
   var isOpen = false, isWaiting = false, welcomed = false;
 
+  // Full conversation history — sent with every message so AI never forgets
+  var conversationHistory = [];
+
   function toggleChat() {
     isOpen = !isOpen;
     chatWin.classList.toggle("open", isOpen);
@@ -438,24 +440,74 @@ const CLIENT = {
     if (el) el.remove();
   }
 
+  // Handle lead captured
+  function handleLeadCaptured(raw) {
+    var parts = {};
+    raw.replace("LEAD_CAPTURED|", "").split("|").forEach(function(p) {
+      var idx = p.indexOf(":");
+      if (idx > -1) {
+        var k = p.substring(0, idx).trim();
+        var v = p.substring(idx + 1).trim();
+        if (k && v) parts[k] = v;
+      }
+    });
+    var name = parts.name || "";
+    var phone = parts.phone || "your number";
+    var confirmMsg = "Thank you" + (name ? " " + name : "") + "! \uD83C\uDF89 We've got your details and Pranit will personally reach out to you on " + phone + " shortly. Looking forward to working with you!";
+    addMsg("bot", confirmMsg);
+
+    // Silently send captured leads for Google Sheets
+    fetch(CLIENT.webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "lead",
+        name: parts.name || "",
+        phone: parts.phone || "",
+        email: parts.email || "",
+        business: parts.business || "",
+        timestamp: new Date().toISOString()
+      })
+    }).catch(function() {});
+
+    // Reset history after lead captured so conversation starts fresh
+    conversationHistory = [];
+  }
+
   async function sendMessage() {
     var text = input.value.trim();
     if (!text || isWaiting) return;
+
+    // Add to history before sending
+    conversationHistory.push({ role: "user", content: text });
     addMsg("user", text);
     input.value = "";
     input.style.height = "auto";
     isWaiting = true;
     sendBtn.disabled = true;
     showTyping();
+
     try {
       var res = await fetch(CLIENT.webhookUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text })
+        body: JSON.stringify({
+          message: text,
+          history: conversationHistory  // full history so AI never forgets
+        })
       });
       var data = await res.json();
       hideTyping();
-      addMsg("bot", data.reply || data.message || data.response || "I received your message!");
+      var reply = data.reply || data.message || data.response || "I received your message!";
+
+      // Check if AI has collected all lead details
+      if (reply.indexOf("LEAD_CAPTURED") !== -1) {
+        handleLeadCaptured(reply);
+      } else {
+        addMsg("bot", reply);
+        // Add AI reply to history for next message
+        conversationHistory.push({ role: "assistant", content: reply });
+      }
     } catch (err) {
       hideTyping();
       addMsg("bot", CLIENT.errorMessage);
