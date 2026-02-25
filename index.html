@@ -470,8 +470,8 @@ const CLIENT = {
       })
     }).catch(function() {});
 
-    // Reset history after lead captured so conversation starts fresh
-    conversationHistory = [];
+    // Reset history after lead captured so  starts fresh
+    History = [];
   }
 
   async function sendMessage() {
@@ -479,7 +479,7 @@ const CLIENT = {
     if (!text || isWaiting) return;
 
     // Add to history before sending
-    conversationHistory.push({ role: "user", content: text });
+    History.push({ role: "user", content: text });
     addMsg("user", text);
     input.value = "";
     input.style.height = "auto";
@@ -493,7 +493,7 @@ const CLIENT = {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: text,
-          history: conversationHistory  // full history so AI never forgets
+          history: JSON.stringify(conversationHistory)  // full history so AI never forgets and stringify so the history don't break JSON syntax
         })
       });
       var data = await res.json();
