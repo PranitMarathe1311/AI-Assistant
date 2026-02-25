@@ -467,15 +467,26 @@ const CLIENT = {
     var text = input.value.trim();
     if (!text || isWaiting) return;
 
-    // Build plain text history — using | separator instead of newlines to avoid JSON breaking
-    var historyText = conversationHistory.slice(-6).map(function(m) {
-      return (m.role === "user" ? "Visitor" : "Saanvi") + ": " + m.content;
+    // Sanitize text — remove ALL characters that break Make.com JSON body
+    var safeText = text
+      .replace(/[\r\n\t]/g, " ")       // newlines → space
+      .replace(/['"]/g, "")            // quotes & apostrophes → removed
+      .replace(/[^\x20-\x7E]/g, "")   // non-ASCII → removed
+      .trim();
+
+    // Build plain text history using safe separator
+    var historyText = conversationHistory.slice(-4).map(function(m) {
+      return (m.role === "user" ? "Visitor" : "Saanvi") + ": " + m.content
+        .replace(/[\r\n\t]/g, " ")
+        .replace(/['"]/g, "")
+        .replace(/[^\x20-\x7E]/g, "")
+        .trim();
     }).join(" | ");
 
     // Prepend history to message so Groq has full context
     var fullMessage = conversationHistory.length > 0
-      ? "CONVERSATION SO FAR: " + historyText + " | Current message: " + text
-      : text;
+      ? "CONVERSATION SO FAR: " + historyText + " | Current message: " + safeText
+      : safeText;
 
     conversationHistory.push({ role: "user", content: text });
     addMsg("user", text);
@@ -498,7 +509,9 @@ const CLIENT = {
         handleLeadCaptured(reply);
       } else {
         addMsg("bot", reply);
-        conversationHistory.push({ role: "assistant", content: reply });
+        // Sanitize reply before storing — prevents quotes in AI response from breaking JSON later
+        var safeReply = reply.replace(/[\r\n\t]/g, " ").replace(/['"]/g, "").replace(/[^\x20-\x7E]/g, "").trim();
+        conversationHistory.push({ role: "assistant", content: safeReply });
       }
     } catch (err) {
       hideTyping();
