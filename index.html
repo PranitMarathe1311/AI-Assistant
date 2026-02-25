@@ -368,7 +368,7 @@ const CLIENT = {
 
   var isOpen = false, isWaiting = false, welcomed = false;
 
-  // Full conversation history — sent with every message so AI never forgets
+  // Conversation history — keeps context so AI never forgets
   var conversationHistory = [];
 
   function toggleChat() {
@@ -393,7 +393,6 @@ const CLIENT = {
     var isUser = sender === "user";
     var msgWrap = document.createElement("div");
     msgWrap.className = "msg " + (isUser ? "user" : "bot");
-
     var av = document.createElement("div");
     av.className = "msg-av";
     if (!isUser && CLIENT.logo) {
@@ -403,7 +402,6 @@ const CLIENT = {
     } else {
       av.textContent = isUser ? "You" : CLIENT.initials;
     }
-
     var bw = document.createElement("div");
     bw.className = "msg-wrap";
     var b = document.createElement("div");
@@ -414,7 +412,6 @@ const CLIENT = {
     t.textContent = getTime();
     bw.appendChild(b);
     bw.appendChild(t);
-
     msgWrap.appendChild(av);
     msgWrap.appendChild(bw);
     messages.appendChild(msgWrap);
@@ -440,23 +437,17 @@ const CLIENT = {
     if (el) el.remove();
   }
 
-  // Handle lead captured
   function handleLeadCaptured(raw) {
     var parts = {};
     raw.replace("LEAD_CAPTURED|", "").split("|").forEach(function(p) {
       var idx = p.indexOf(":");
       if (idx > -1) {
-        var k = p.substring(0, idx).trim();
-        var v = p.substring(idx + 1).trim();
-        if (k && v) parts[k] = v;
+        parts[p.substring(0, idx).trim()] = p.substring(idx + 1).trim();
       }
     });
     var name = parts.name || "";
     var phone = parts.phone || "your number";
-    var confirmMsg = "Thank you" + (name ? " " + name : "") + "! \uD83C\uDF89 We've got your details and Pranit will personally reach out to you on " + phone + " shortly. Looking forward to working with you!";
-    addMsg("bot", confirmMsg);
-
-    // Silently send captured leads for Google Sheets
+    addMsg("bot", "Thank you" + (name ? " " + name : "") + "! \uD83C\uDF89 We've got your details and Pranit will personally reach out to you on " + phone + " shortly. Looking forward to working with you!");
     fetch(CLIENT.webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -469,17 +460,24 @@ const CLIENT = {
         timestamp: new Date().toISOString()
       })
     }).catch(function() {});
-
-    // Reset history after lead captured so  starts fresh
-    History = [];
+    conversationHistory = [];
   }
 
   async function sendMessage() {
     var text = input.value.trim();
     if (!text || isWaiting) return;
 
-    // Add to history before sending
-    History.push({ role: "user", content: text });
+    // Build plain text history — safe, never breaks JSON
+    var historyText = conversationHistory.slice(-6).map(function(m) {
+      return (m.role === "user" ? "Visitor" : "Saanvi") + ": " + m.content;
+    }).join("\n");
+
+    // Prepend history to message so Groq has full context
+    var fullMessage = conversationHistory.length > 0
+      ? "CONVERSATION SO FAR:\n" + historyText + "\n\nCurrent message: " + text
+      : text;
+
+    conversationHistory.push({ role: "user", content: text });
     addMsg("user", text);
     input.value = "";
     input.style.height = "auto";
@@ -491,28 +489,15 @@ const CLIENT = {
       var res = await fetch(CLIENT.webhookUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        
-        var historyText = conversationHistory.slice(-6).map(function(m) {
-          return (m.role === "user" ? "Visitor: " : "Saanvi: ") + m.content;
-        }).join("\n");
-
-      // Format history as clean readable text
-        body: JSON.stringify({
-          message: text,
-          history: historyText
-        })  // full history so AI never forgets and stringify so the history don't break JSON syntax
-        })
+        body: JSON.stringify({ message: fullMessage })
       });
       var data = await res.json();
       hideTyping();
       var reply = data.reply || data.message || data.response || "I received your message!";
-
-      // Check if AI has collected all lead details
       if (reply.indexOf("LEAD_CAPTURED") !== -1) {
         handleLeadCaptured(reply);
       } else {
         addMsg("bot", reply);
-        // Add AI reply to history for next message
         conversationHistory.push({ role: "assistant", content: reply });
       }
     } catch (err) {
