@@ -6,18 +6,14 @@ const CLIENT = {
 
   // -- ASSISTANT IDENTITY --
   name:            "Saanvi",          // Name shown in chat header
-  initials:        "AI",            // Shown in avatar circle if no logo
-  logo:            "https://pranitmarathe1311.github.io/AI-Assistant/Logo.jpeg",              // Direct image URL (leave "" to use initials)
-                                    // e.g. "https://example.com/logo.png"
+  initials:        "AI",              // Shown in avatar circle if no logo
+  logo:            "https://pranitmarathe1311.github.io/AI-Assistant/Logo.jpeg",
 
   // -- COLORS --
-  primaryColor:    "#0D1B2A",       // Header, bubble button, user messages
-  accentColor:     "#00B4D8",       // Glow ring, typing dots, focus borders
+  primaryColor:    "#0D1B2A",
+  accentColor:     "#00B4D8",
 
   // -- FONT --
-  // Options: "'DM Sans', sans-serif" | "'Inter', sans-serif"  |
-  //          "'Poppins', sans-serif" | "'Nunito', sans-serif" |
-  //          "'Lato', sans-serif"    | "Georgia, serif"
   font:            "'DM Sans', sans-serif",
 
   // -- MESSAGES --
@@ -28,16 +24,17 @@ const CLIENT = {
   statusText:      "● Online",
 
   // -- SIZE (pixels) --
-  chatWidth:       370,             // Chat window width  (recommended: 300–500)
-  chatHeight:      520,             // Chat window height (recommended: 380–700)
-  bubbleSize:      60,              // Floating button size (recommended: 48–80)
+  chatWidth:       370,
+  chatHeight:      520,
+  bubbleSize:      60,
 
   // -- POSITION --
-  bottomOffset:    28,              // Distance from bottom of screen (px)
-  rightOffset:     28,              // Distance from right of screen (px)
+  bottomOffset:    28,
+  rightOffset:     28,
 
   // -- CONNECTION --
-  webhookUrl:      "https://hook.eu1.make.com/dcfid7768ftknwooemtpvecp3xjr4otd",
+  webhookUrl:      "https://hook.eu1.make.com/v3c2kfkj2x58vfl4pl7hk7bezothmmmi",   // Scenario A — Chat Reply
+  leadWebhookUrl:  "https://hook.eu1.make.com/9nnitjzwhce5h0wqeobo55zjnhf9vhzs",   // Scenario B — Lead Capture
 
 };
 
@@ -315,6 +312,9 @@ const CLIENT = {
 
   let isOpen = false, isWaiting = false, welcomed = false;
 
+  // Conversation history — keeps context so AI never forgets
+  let conversationHistory = [];
+
   function toggleChat() {
     isOpen = !isOpen;
     chatWin.classList.toggle('open', isOpen);
@@ -379,24 +379,86 @@ const CLIENT = {
     if (el) el.remove();
   }
 
+  // Fires only when AI returns LEAD_CAPTURED — sends to Scenario B
+  function handleLeadCaptured(raw) {
+    const parts = {};
+    raw.replace('LEAD_CAPTURED|', '').split('|').forEach(p => {
+      const idx = p.indexOf(':');
+      if (idx > -1) parts[p.substring(0, idx).trim()] = p.substring(idx + 1).trim();
+    });
+    const name  = parts.name  || '';
+    const phone = parts.phone || 'your number';
+    addMsg('bot', `Thank you${name ? ' ' + name : ''}! 🎉 We've got your details and will personally reach out to you on ${phone} shortly. Looking forward to working with you!`);
+
+    // Fire Scenario B — Lead Capture only
+    fetch(CLIENT.leadWebhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type:      'lead',
+        name:      parts.name     || '',
+        phone:     parts.phone    || '',
+        email:     parts.email    || '',
+        business:  parts.business || '',
+        timestamp: new Date().toISOString()
+      })
+    }).catch(() => {});
+
+    conversationHistory = [];
+  }
+
   async function sendMessage() {
     const text = input.value.trim();
     if (!text || isWaiting) return;
+
+    // Sanitize — remove characters that break Make.com JSON
+    const safeText = text
+      .replace(/[\r\n\t]/g, ' ')
+      .replace(/['"]/g, '')
+      .replace(/[^\x20-\x7E]/g, '')
+      .trim();
+
+    // Build conversation history string (last 4 messages)
+    const historyText = conversationHistory.slice(-4).map(m =>
+      (m.role === 'user' ? 'Visitor' : CLIENT.name) + ': ' +
+      m.content.replace(/[\r\n\t]/g, ' ').replace(/['"]/g, '').replace(/[^\x20-\x7E]/g, '').trim()
+    ).join(' | ');
+
+    // Prepend history so AI has full context
+    const fullMessage = conversationHistory.length > 0
+      ? 'CONVERSATION SO FAR: ' + historyText + ' | Current message: ' + safeText
+      : safeText;
+
+    conversationHistory.push({ role: 'user', content: text });
     addMsg('user', text);
     input.value = '';
     input.style.height = 'auto';
     isWaiting = true;
     sendBtn.disabled = true;
     showTyping();
+
     try {
+      // Fire Scenario A — Chat Reply only
       const res  = await fetch(CLIENT.webhookUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text }),
+        body: JSON.stringify({ message: fullMessage }),
       });
       const data = await res.json();
       hideTyping();
-      addMsg('bot', data.reply || data.message || data.response || 'Got it!');
+      const reply = data.reply || data.message || data.response || 'Got it!';
+
+      if (reply.indexOf('LEAD_CAPTURED') !== -1) {
+        handleLeadCaptured(reply);
+      } else {
+        addMsg('bot', reply);
+        const safeReply = reply
+          .replace(/[\r\n\t]/g, ' ')
+          .replace(/['"]/g, '')
+          .replace(/[^\x20-\x7E]/g, '')
+          .trim();
+        conversationHistory.push({ role: 'assistant', content: safeReply });
+      }
     } catch {
       hideTyping();
       addMsg('bot', CLIENT.errorMessage);
