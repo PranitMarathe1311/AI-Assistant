@@ -47,7 +47,8 @@ const CLIENT = {
   rightOffset:    28,               // Distance from right of screen (px)
 
   // -- CONNECTION --
-  webhookUrl:     "https://hook.eu1.make.com/dcfid7768ftknwooemtpvecp3xjr4otd",
+  webhookUrl:     "https://hook.eu1.make.com/v3c2kfkj2x58vfl4pl7hk7bezothmmmi",  // Chat reply webhook
+  leadWebhookUrl: "https://hook.eu1.make.com/9nnitjzwhce5h0wqeobo55zjnhf9vhzs",  // Lead capture webhook,
 
 };
 
@@ -448,7 +449,7 @@ const CLIENT = {
     var name = parts.name || "";
     var phone = parts.phone || "your number";
     addMsg("bot", "Thank you" + (name ? " " + name : "") + "! \uD83C\uDF89 We've got your details and Pranit will personally reach out to you on " + phone + " shortly. Looking forward to working with you!");
-    fetch(CLIENT.webhookUrl, {
+    fetch(CLIENT.leadWebhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
